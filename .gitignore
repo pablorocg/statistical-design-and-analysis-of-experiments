@@ -1,0 +1,21 @@
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore Jupyter Notebooks
+*.ipynb
+
+# Ignore large files
+*.log
+*.csv
+*.dat
+*.tmp
+*.bak
+*.swp
+*.swo
+*.tar
+*.tar.gz
+*.zip
+*.rar
+*.7z
