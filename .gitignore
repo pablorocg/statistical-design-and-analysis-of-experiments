@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 # Ignore Jupyter Notebooks
-*.ipynb
+# *.ipynb
 
 # Ignore large files
 *.log

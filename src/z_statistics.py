@@ -219,7 +219,7 @@ def visualize_z_distribution(
     
     # Add z-statistic
     sns.lineplot(x=[z_stat, z_stat], y=[0, max(y)*1.1], color=stat_color, linestyle="-", 
-                linewidth=1.5, ax=ax1, label=f"Z-statistic: {z_stat:.4f} (p={results['p_value']:.4f})")
+                linewidth=2.5, ax=ax1, label=f"Z-statistic: {z_stat:.4f} (p={results['p_value']:.4f})")
     
     # Set title and labels with Seaborn styling
     title_suffix = {
