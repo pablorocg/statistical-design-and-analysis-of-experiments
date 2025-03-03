@@ -1,18 +1,15 @@
 """
-F-Distribution Functions.
+F-Distribution Functions - Optimized Version
 """
-
-from typing import Literal, Optional, Tuple
-
-import matplotlib.pyplot as plt
+from typing import Literal, Optional, Tuple, Dict, Any, Union
 import numpy as np
 import scipy.stats as stats
+import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.figure import Figure
 
-# Set seaborn style
+# Set theme once at module level
 sns.set_theme(style="whitegrid")
-
 
 def calculate_f_distribution(
     df1: int,
@@ -20,7 +17,7 @@ def calculate_f_distribution(
     alpha: float = 0.05,
     alternative: Literal["two-sided", "greater", "less"] = "two-sided",
     f_stat: Optional[float] = None,
-) -> dict:
+) -> Dict[str, Any]:
     """Calculate F-distribution critical values, p-values and confidence intervals."""
     # Validate inputs
     if not (isinstance(df1, int) and isinstance(df2, int) and df1 > 0 and df2 > 0):
@@ -30,7 +27,7 @@ def calculate_f_distribution(
     if alternative not in ["two-sided", "greater", "less"]:
         raise ValueError("Alternative must be 'two-sided', 'greater', or 'less'")
 
-    # Calculate critical values
+    # Calculate critical values based on alternative hypothesis
     critical_values = {}
     if alternative == "two-sided":
         critical_values = {
@@ -46,9 +43,7 @@ def calculate_f_distribution(
     results = {
         "critical_values": critical_values,
         "parameters": {
-            "df1": df1,
-            "df2": df2,
-            "alpha": alpha,
+            "df1": df1, "df2": df2, "alpha": alpha,
             "alternative": alternative,
             "confidence_level": (1 - alpha) * 100,
         },
@@ -61,7 +56,7 @@ def calculate_f_distribution(
 
         results["f_stat"] = f_stat
 
-        # Calculate p-value
+        # Calculate p-value based on alternative hypothesis
         if alternative == "two-sided":
             p_value = 2 * min(
                 1 - stats.f.cdf(f_stat, df1, df2), stats.f.cdf(f_stat, df1, df2)
@@ -74,7 +69,7 @@ def calculate_f_distribution(
         results["p_value"] = p_value
         results["reject_null"] = p_value < alpha
 
-        # Calculate confidence interval
+        # Calculate confidence interval based on alternative hypothesis
         if alternative == "two-sided":
             ci = (f_stat / critical_values["upper"], f_stat / critical_values["lower"])
         elif alternative == "greater":
@@ -86,12 +81,11 @@ def calculate_f_distribution(
 
     return results
 
-
-def format_f_results(results: dict, decimals: int = 4) -> str:
+def format_f_results(results: Dict[str, Any], decimals: int = 4) -> str:
     """Format the results into a readable string."""
     params = results["parameters"]
     crit_vals = results["critical_values"]
-
+    
     lines = [
         "F-Distribution Analysis Results:",
         "--------------------------------",
@@ -101,39 +95,38 @@ def format_f_results(results: dict, decimals: int = 4) -> str:
         f"  - Denominator df (df2): {params['df2']}",
         f"  - Alpha: {params['alpha']}",
         f"  - Confidence Level: {params['confidence_level']}%",
-        "\nCritical Values:",
+        "\nCritical Values:"
     ]
-
-    if "upper" in crit_vals:
-        lines.append(f"  - Upper: {crit_vals['upper']:.{decimals}f}")
-    if "lower" in crit_vals:
-        lines.append(f"  - Lower: {crit_vals['lower']:.{decimals}f}")
-
+    
+    # Add critical values based on what's available
+    for key, label in [("upper", "Upper"), ("lower", "Lower")]:
+        if key in crit_vals:
+            lines.append(f"  - {label}: {crit_vals[key]:.{decimals}f}")
+    
+    # Add test results if available
     if "p_value" in results:
-        lines.extend(
-            [
-                f"\nP-value: {results['p_value']:.{decimals}f}",
-                f"F-statistic: {results['f_stat']:.{decimals}f}",
-                "\nTest Interpretation:",
-                "  Reject the null hypothesis"
-                if results["p_value"] < params["alpha"]
-                else "  Fail to reject the null hypothesis",
-            ]
-        )
-
+        lines.extend([
+            f"\nP-value: {results['p_value']:.{decimals}f}",
+            f"F-statistic: {results['f_stat']:.{decimals}f}",
+            "\nTest Interpretation:",
+            f"  {'Reject' if results['p_value'] < params['alpha'] else 'Fail to reject'} the null hypothesis"
+        ])
+    
+    # Add confidence interval if available
     if "confidence_interval" in results:
         ci = results["confidence_interval"]
         lower = "0" if ci[0] == 0 else f"{ci[0]:.{decimals}f}"
         upper = "∞" if ci[1] == float("inf") else f"{ci[1]:.{decimals}f}"
         lines.extend(["\nConfidence Interval:", f"  ({lower}, {upper})"])
-
+    
     return "\n".join(lines)
 
-
 def visualize_f_distribution(
-    results: dict, show_plot: bool = True, figure_size: Tuple[int, int] = (10, 6)
+    results: Dict[str, Any], 
+    show_plot: bool = True, 
+    figure_size: Tuple[int, int] = (10, 6)
 ) -> Optional[Figure]:
-    """Visualize the F-distribution analysis results using Seaborn."""
+    """Visualize the F-distribution analysis results with improved clarity."""
     # Extract parameters
     params = results["parameters"]
     df1, df2 = params["df1"], params["df2"]
@@ -141,185 +134,117 @@ def visualize_f_distribution(
     alternative = params["alternative"]
     critical_values = results["critical_values"]
     f_stat = results.get("f_stat")
-
-    # Create figure with Seaborn styling
-    sns.set_style("whitegrid")
+    
+    # Create figure
     fig, ax = plt.subplots(figsize=figure_size)
-
-    # X-range
-    if alternative == "two-sided":
-        x_max = max(
-            critical_values.get("upper", 0) * 1.5, f_stat * 1.2 if f_stat else 0
-        )
-    elif alternative == "greater":
-        x_max = max(
-            critical_values.get("upper", 0) * 1.5, f_stat * 1.2 if f_stat else 0
-        )
-    else:  # less
-        x_max = max(critical_values.get("lower", 0) * 3, f_stat * 1.2 if f_stat else 0)
-    x_max = max(x_max, 5)
-    x = np.linspace(0.001, x_max, 1000)
-
-    # Plot PDF with Seaborn
-    y = stats.f.pdf(x, df1, df2)
-    sns.lineplot(
-        x=x,
-        y=y,
-        ax=ax,
-        color=sns.color_palette()[0],
-        linewidth=2,
-        label=f"F({df1}, {df2})",
+    
+    # Determine x-range
+    upper_crit = critical_values.get("upper", 0)
+    lower_crit = critical_values.get("lower", 0)
+    x_max = max(
+        upper_crit * 1.5 if upper_crit else 0,
+        lower_crit * 3 if lower_crit else 0,
+        f_stat * 1.2 if f_stat else 0,
+        5  # Minimum x-range
     )
-
-    # Use Seaborn color palette
+    x = np.linspace(0.001, x_max, 1000)
+    
+    # Plot PDF
+    y = stats.f.pdf(x, df1, df2)
+    ax.plot(x, y, linewidth=2, label=f"F({df1}, {df2})")
+    
+    # Get colors for visualization
     colors = sns.color_palette("muted")
-    reject_color = colors[3]  # Usually red/orange in muted palette
-    stat_color = colors[2]  # Usually green in muted palette
-
-    # Shade regions and add critical lines
+    reject_color = colors[3]  # Red/orange
+    stat_color = colors[2]    # Green
+    
+    # Handle visualization based on test type
     if alternative == "two-sided":
         lower, upper = critical_values["lower"], critical_values["upper"]
-        # Lower tail
-        x_lower = np.linspace(0.001, lower, 100)
-        y_lower = stats.f.pdf(x_lower, df1, df2)
+        # Shade rejection regions
         ax.fill_between(
-            x_lower,
-            y_lower,
-            alpha=0.3,
-            color=reject_color,
-            label=f"Rejection region (α/2={alpha / 2:.3f})",
+            np.linspace(0.001, lower, 100), 
+            stats.f.pdf(np.linspace(0.001, lower, 100), df1, df2),
+            alpha=0.3, color=reject_color, 
+            label=f"Rejection region (α/2={alpha/2:.3f})"
         )
-        # Upper tail
-        x_upper = np.linspace(upper, x_max, 100)
-        y_upper = stats.f.pdf(x_upper, df1, df2)
-        ax.fill_between(x_upper, y_upper, alpha=0.3, color=reject_color)
-        # Critical lines
-        sns.lineplot(
-            x=[lower, lower],
-            y=[0, max(y) * 1.1],
-            color=reject_color,
-            linestyle="--",
-            ax=ax,
-            label=f"Critical values: {lower:.4f}, {upper:.4f}",
-        )
-        sns.lineplot(
-            x=[upper, upper],
-            y=[0, max(y) * 1.1],
-            color=reject_color,
-            linestyle="--",
-            ax=ax,
-        )
-
-    elif alternative == "greater":
-        upper = critical_values["upper"]
-        # Upper tail
-        x_upper = np.linspace(upper, x_max, 100)
-        y_upper = stats.f.pdf(x_upper, df1, df2)
         ax.fill_between(
-            x_upper,
-            y_upper,
-            alpha=0.3,
-            color=reject_color,
-            label=f"Rejection region (α={alpha:.3f})",
+            np.linspace(upper, x_max, 100),
+            stats.f.pdf(np.linspace(upper, x_max, 100), df1, df2),
+            alpha=0.3, color=reject_color
         )
-        # Critical line
-        sns.lineplot(
-            x=[upper, upper],
-            y=[0, max(y) * 1.1],
-            color=reject_color,
-            linestyle="--",
-            ax=ax,
-            label=f"Critical value: {upper:.4f}",
+        # Add critical lines
+        for val, label in [(lower, f"Critical values: {lower:.4f}, {upper:.4f}"), (upper, None)]:
+            ax.axvline(
+                x=val, color=reject_color, linestyle='--', 
+                linewidth=2, label=label, zorder=10
+            )
+    else:
+        # Single-sided tests
+        crit_key = "upper" if alternative == "greater" else "lower"
+        crit_val = critical_values[crit_key]
+        
+        # Shade rejection region
+        x_range = (
+            np.linspace(crit_val, x_max, 100) if alternative == "greater" 
+            else np.linspace(0.001, crit_val, 100)
         )
-
-    else:  # less
-        lower = critical_values["lower"]
-        # Lower tail
-        x_lower = np.linspace(0.001, lower, 100)
-        y_lower = stats.f.pdf(x_lower, df1, df2)
         ax.fill_between(
-            x_lower,
-            y_lower,
-            alpha=0.3,
-            color=reject_color,
-            label=f"Rejection region (α={alpha:.3f})",
+            x_range,
+            stats.f.pdf(x_range, df1, df2),
+            alpha=0.3, color=reject_color,
+            label=f"Rejection region (α={alpha:.3f})"
         )
-        # Critical line
-        sns.lineplot(
-            x=[lower, lower],
-            y=[0, max(y) * 1.1],
-            color=reject_color,
-            linestyle="--",
-            ax=ax,
-            label=f"Critical value: {lower:.4f}",
+        # Add critical line
+        ax.axvline(
+            x=crit_val, color=reject_color, linestyle='--',
+            linewidth=2, zorder=10,
+            label=f"Critical value: {crit_val:.4f}"
         )
-
+    
     # Add F-statistic if provided
     if f_stat is not None:
-        sns.lineplot(
-            x=[f_stat, f_stat],
-            y=[0, max(y) * 1.1],
-            color=stat_color,
-            linestyle="-",
-            linewidth=1.5,
-            ax=ax,
-            label=f"F-statistic: {f_stat:.4f} (p={results['p_value']:.4f})",
+        ax.axvline(
+            x=f_stat, color=stat_color, linewidth=2, zorder=10,
+            label=f"F-statistic: {f_stat:.4f} (p={results['p_value']:.4f})"
         )
-
-        # Highlight confidence interval
+        
+        # Add confidence interval if available
         if "confidence_interval" in results:
             ci = results["confidence_interval"]
             ci_label = f"{params['confidence_level']}% CI: "
-
+            
+            # Determine CI display based on bounds
             if ci[0] > 0 and ci[1] < float("inf"):
-                ax.axvspan(
-                    ci[0],
-                    ci[1],
-                    alpha=0.2,
-                    color=stat_color,
-                    label=f"{ci_label}({ci[0]:.4f}, {ci[1]:.4f})",
-                )
+                ax.axvspan(ci[0], ci[1], alpha=0.2, color=stat_color,
+                           label=f"{ci_label}({ci[0]:.4f}, {ci[1]:.4f})")
             elif ci[0] > 0:
-                ax.axvspan(
-                    ci[0],
-                    x_max,
-                    alpha=0.2,
-                    color=stat_color,
-                    label=f"{ci_label}({ci[0]:.4f}, ∞)",
-                )
+                ax.axvspan(ci[0], x_max, alpha=0.2, color=stat_color,
+                           label=f"{ci_label}({ci[0]:.4f}, ∞)")
             elif ci[1] < float("inf"):
-                ax.axvspan(
-                    0,
-                    ci[1],
-                    alpha=0.2,
-                    color=stat_color,
-                    label=f"{ci_label}(0, {ci[1]:.4f})",
-                )
-
-    # Labels and formatting with Seaborn styling
+                ax.axvspan(0, ci[1], alpha=0.2, color=stat_color,
+                           label=f"{ci_label}(0, {ci[1]:.4f})")
+    
+    # Set title and labels
     title_suffix = {
         "two-sided": f" - Two-sided Test (α={alpha:.3f})",
         "greater": f" - Right-tailed Test (α={alpha:.3f})",
         "less": f" - Left-tailed Test (α={alpha:.3f})",
     }
-
-    ax.set_title(
-        f"F-Distribution (df1={df1}, df2={df2}){title_suffix[alternative]}", fontsize=13
-    )
+    ax.set_title(f"F-Distribution (df1={df1}, df2={df2}){title_suffix[alternative]}", fontsize=13)
     ax.set_xlabel("F Value", fontsize=11)
     ax.set_ylabel("Probability Density", fontsize=11)
     ax.legend(loc="best", frameon=True, framealpha=0.7)
     ax.set_ylim(bottom=0)
-
-    # Add despine for cleaner look
+    
+    # Final formatting
     sns.despine(left=False, bottom=False)
     plt.tight_layout()
-
+    
     if show_plot:
         plt.show()
         return None
     return fig
-
 
 def analyze_f_distribution(
     df1: int,
@@ -328,13 +253,12 @@ def analyze_f_distribution(
     alternative: Literal["two-sided", "greater", "less"] = "two-sided",
     f_stat: Optional[float] = None,
     visualize: bool = True,
+    show_plot: bool = True,
     figure_size: Tuple[int, int] = (10, 6),
-) -> Tuple[dict, Optional[Figure]]:
+) -> Tuple[Dict[str, Any], Optional[Figure]]:
     """Analyze F-distribution with calculations and optional visualization."""
     results = calculate_f_distribution(df1, df2, alpha, alternative, f_stat)
-    fig = (
-        visualize_f_distribution(results, show_plot=visualize, figure_size=figure_size)
-        if visualize
-        else None
-    )
+    fig = None
+    if visualize:
+        fig = visualize_f_distribution(results, show_plot=show_plot, figure_size=figure_size)
     return results, fig

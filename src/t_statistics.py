@@ -1,18 +1,15 @@
 """
-T-Distribution and T-Test Functions
+T-Distribution and T-Test Functions - Optimized Version
 """
-
-from typing import Dict, Optional, Tuple, Literal
-
-import matplotlib.pyplot as plt
+from typing import Dict, Optional, Tuple, Literal, Any, Union
 import numpy as np
 import scipy.stats as stats
+import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.figure import Figure
 
-# Set seaborn style
+# Set theme once at module level
 sns.set_theme(style="whitegrid")
-
 
 def calculate_t_critical(
     df: int,
@@ -21,7 +18,7 @@ def calculate_t_critical(
     t_stat: Optional[float] = None,
     mean_diff: Optional[float] = None,
     std_error: Optional[float] = None,
-) -> Dict:
+) -> Dict[str, Any]:
     """Calculate t-distribution critical values and related statistics."""
     # Input validation
     if not isinstance(df, int) or df <= 0:
@@ -85,12 +82,12 @@ def calculate_t_critical(
 
     return results
 
-
-def format_t_results(results: Dict, decimals: int = 4) -> str:
+def format_t_results(results: Dict[str, Any], decimals: int = 4) -> str:
     """Format the results into a readable string."""
     params = results["parameters"]
     crit_vals = results["critical_values"]
     
+    # Create formatted string with f-strings for readability
     lines = [
         "T-Distribution Analysis Results:",
         "-------------------------------",
@@ -102,19 +99,21 @@ def format_t_results(results: Dict, decimals: int = 4) -> str:
     ]
     
     # Add critical values
-    if "upper" in crit_vals:
-        lines.append(f"  Upper: {crit_vals['upper']:.{decimals}f}")
-    if "lower" in crit_vals:
-        lines.append(f"  Lower: {crit_vals['lower']:.{decimals}f}")
+    for key, label in [("upper", "Upper"), ("lower", "Lower")]:
+        if key in crit_vals:
+            lines.append(f"  {label}: {crit_vals[key]:.{decimals}f}")
 
-    # Add t-statistic and p-value if provided
+    # Add test results if available
     if "t_stat" in results:
+        p_value = results["p_value"]
+        reject = p_value < params["alpha"]
+        compare = "<" if reject else "≥"
+        
         lines.extend([
             f"\nt-statistic: {results['t_stat']:.{decimals}f}",
-            f"P-value: {results['p_value']:.{decimals}f}",
+            f"P-value: {p_value:.{decimals}f}",
             "\nTest Interpretation:",
-            f"  {'Reject' if results['p_value'] < params['alpha'] else 'Fail to reject'} the null hypothesis " +
-            f"(p={results['p_value']:.{decimals}f} {('<' if results['p_value'] < params['alpha'] else '≥')} α={params['alpha']})"
+            f"  {'Reject' if reject else 'Fail to reject'} the null hypothesis (p={p_value:.{decimals}f} {compare} α={params['alpha']})"
         ])
 
     # Add mean difference and standard error if provided
@@ -136,11 +135,12 @@ def format_t_results(results: Dict, decimals: int = 4) -> str:
 
     return "\n".join(lines)
 
-
 def visualize_t_distribution(
-    results: Dict, show_plot: bool = True, figure_size: Tuple[int, int] = (10, 6)
+    results: Dict[str, Any], 
+    show_plot: bool = True, 
+    figure_size: Tuple[int, int] = (10, 6)
 ) -> Optional[Figure]:
-    """Visualize the t-distribution analysis results using Seaborn."""
+    """Visualize the t-distribution analysis results with enhanced clarity."""
     # Extract parameters
     params = results["parameters"]
     df, alpha = params["df"], params["alpha"]
@@ -148,100 +148,107 @@ def visualize_t_distribution(
     critical_values = results["critical_values"]
     t_stat = results.get("t_stat")
 
-    # Create figure with Seaborn styling
-    sns.set_style("whitegrid")
+    # Create figure
     fig, ax = plt.subplots(figsize=figure_size)
     
     # Calculate appropriate x-range
     x_min = -4
     x_max = 4
     
+    # Adjust range based on critical values and t-statistic
     if "lower" in critical_values:
         x_min = min(x_min, critical_values["lower"] * 1.5)
     if "upper" in critical_values:
         x_max = max(x_max, critical_values["upper"] * 1.5)
-        
-    # Adjust range if t-statistic is provided
     if t_stat is not None:
         x_min = min(x_min, t_stat * 1.5 if t_stat < 0 else x_min)
         x_max = max(x_max, t_stat * 1.5 if t_stat > 0 else x_max)
 
+    # Create x and y values for the distribution curve
     x = np.linspace(x_min, x_max, 1000)
-    
-    # Plot PDF with Seaborn
     y = stats.t.pdf(x, df)
-    sns.lineplot(x=x, y=y, color=sns.color_palette()[0], linewidth=2, label=f't({df})')
     
-    # Use Seaborn color palette
+    # Plot the main distribution curve
+    ax.plot(x, y, linewidth=2, label=f't({df})')
+    
+    # Get colors for visualization
     colors = sns.color_palette("muted")
-    reject_color = colors[3]  # Usually red/orange in muted palette
-    stat_color = colors[2]    # Usually green in muted palette
+    reject_color = colors[3]  # Red/orange for rejection regions
+    stat_color = colors[2]    # Green for statistic
     
-    # Shade regions and add critical lines
+    # Visualization based on test type
     if alternative == "two-sided":
         lower, upper = critical_values["lower"], critical_values["upper"]
         
-        # Lower tail
-        x_lower = np.linspace(x_min, lower, 100)
-        y_lower = stats.t.pdf(x_lower, df)
-        ax.fill_between(x_lower, y_lower, alpha=0.3, color=reject_color,
-                      label=f"Rejection region (α/2={alpha/2:.3f})")
+        # Shade rejection regions
+        ax.fill_between(
+            np.linspace(x_min, lower, 100), 
+            stats.t.pdf(np.linspace(x_min, lower, 100), df),
+            alpha=0.3, color=reject_color, 
+            label=f"Rejection region (α/2={alpha/2:.3f})"
+        )
+        ax.fill_between(
+            np.linspace(upper, x_max, 100),
+            stats.t.pdf(np.linspace(upper, x_max, 100), df),
+            alpha=0.3, color=reject_color
+        )
         
-        # Upper tail
-        x_upper = np.linspace(upper, x_max, 100)
-        y_upper = stats.t.pdf(x_upper, df)
-        ax.fill_between(x_upper, y_upper, alpha=0.3, color=reject_color)
-        
-        # Critical lines
-        sns.lineplot(x=[lower, lower], y=[0, max(y)*1.1], color=reject_color, linestyle="--",
+        # Add critical lines
+        ax.axvline(x=lower, color=reject_color, linestyle='--', linewidth=2, 
                   label=f"Critical values: {lower:.4f}, {upper:.4f}")
-        sns.lineplot(x=[upper, upper], y=[0, max(y)*1.1], color=reject_color, linestyle="--")
+        ax.axvline(x=upper, color=reject_color, linestyle='--', linewidth=2)
         
     elif alternative == "greater":
         upper = critical_values["upper"]
         
-        # Upper tail
-        x_upper = np.linspace(upper, x_max, 100)
-        y_upper = stats.t.pdf(x_upper, df)
-        ax.fill_between(x_upper, y_upper, alpha=0.3, color=reject_color,
-                      label=f"Rejection region (α={alpha:.3f})")
+        # Shade upper rejection region
+        ax.fill_between(
+            np.linspace(upper, x_max, 100),
+            stats.t.pdf(np.linspace(upper, x_max, 100), df),
+            alpha=0.3, color=reject_color,
+            label=f"Rejection region (α={alpha:.3f})"
+        )
         
-        # Critical line
-        sns.lineplot(x=[upper, upper], y=[0, max(y)*1.1], color=reject_color, linestyle="--",
+        # Add critical line
+        ax.axvline(x=upper, color=reject_color, linestyle='--', linewidth=2,
                   label=f"Critical value: {upper:.4f}")
         
     else:  # less
         lower = critical_values["lower"]
         
-        # Lower tail
-        x_lower = np.linspace(x_min, lower, 100)
-        y_lower = stats.t.pdf(x_lower, df)
-        ax.fill_between(x_lower, y_lower, alpha=0.3, color=reject_color,
-                      label=f"Rejection region (α={alpha:.3f})")
+        # Shade lower rejection region
+        ax.fill_between(
+            np.linspace(x_min, lower, 100),
+            stats.t.pdf(np.linspace(x_min, lower, 100), df),
+            alpha=0.3, color=reject_color,
+            label=f"Rejection region (α={alpha:.3f})"
+        )
         
-        # Critical line
-        sns.lineplot(x=[lower, lower], y=[0, max(y)*1.1], color=reject_color, linestyle="--",
+        # Add critical line
+        ax.axvline(x=lower, color=reject_color, linestyle='--', linewidth=2,
                   label=f"Critical value: {lower:.4f}")
     
     # Add t-statistic if provided
     if t_stat is not None:
-        sns.lineplot(x=[t_stat, t_stat], y=[0, max(y)*1.1], color=stat_color, linestyle="-",
-                  linewidth=1.5, label=f"t-statistic: {t_stat:.4f} (p={results['p_value']:.4f})")
+        ax.axvline(x=t_stat, color=stat_color, linestyle='-', linewidth=2,
+                  label=f"t-statistic: {t_stat:.4f} (p={results['p_value']:.4f})")
         
-        # Add confidence interval visualization if provided
-        if "confidence_interval" in results and "mean_diff" in results and "std_error" in results:
+        # Add confidence interval visualization if available
+        if "confidence_interval" in results and "mean_diff" in results:
             ci = results["confidence_interval"]
             mean_diff = results["mean_diff"]
             
-            # Create inset for CI visualization
+            # Create inset for confidence interval visualization
             if ci[0] > float("-inf") and ci[1] < float("inf"):
+                # Create inset axes for CI visualization
                 ax_inset = fig.add_axes([0.15, 0.55, 0.3, 0.2])
                 
+                # Calculate appropriate x range for inset
                 ci_width = ci[1] - ci[0]
-                x_ci = np.linspace(ci[0] - 0.1 * ci_width, ci[1] + 0.1 * ci_width, 2)
+                x_padding = 0.1 * ci_width
                 
                 # Add reference line at zero
-                sns.lineplot(x=[0, 0], y=[0, 1], color=reject_color, linestyle="--", alpha=0.5, ax=ax_inset)
+                ax_inset.axvline(x=0, color=reject_color, linestyle='--', alpha=0.5)
                 
                 # Plot mean with error bars
                 ax_inset.errorbar(
@@ -250,12 +257,14 @@ def visualize_t_distribution(
                     fmt='o', color=stat_color, capsize=5, markersize=8
                 )
                 
+                # Format inset axes
                 ax_inset.set_yticks([])
                 ax_inset.set_title(f"{params['confidence_level']}% CI", fontsize=10)
                 ax_inset.set_xlabel('Mean Difference', fontsize=8)
+                ax_inset.set_xlim(ci[0] - x_padding, ci[1] + x_padding)
                 sns.despine(ax=ax_inset, left=True)
     
-    # Add title and labels with Seaborn styling
+    # Add title and labels
     title_suffix = {
         "two-sided": f" - Two-sided Test (α={alpha:.3f})",
         "greater": f" - Right-tailed Test (α={alpha:.3f})",
@@ -268,7 +277,7 @@ def visualize_t_distribution(
     ax.legend(loc='best', frameon=True, framealpha=0.7)
     ax.set_ylim(bottom=0)
     
-    # Add despine for cleaner look
+    # Final formatting
     sns.despine(left=False, bottom=False)
     plt.tight_layout()
     
@@ -276,7 +285,6 @@ def visualize_t_distribution(
         plt.show()
         return None
     return fig
-
 
 def analyze_t_distribution(
     df: int,
@@ -286,9 +294,12 @@ def analyze_t_distribution(
     mean_diff: Optional[float] = None,
     std_error: Optional[float] = None,
     visualize: bool = True,
+    show_plot: bool = True,
     figure_size: Tuple[int, int] = (10, 6),
-) -> Tuple[Dict, Optional[Figure]]:
+) -> Tuple[Dict[str, Any], Optional[Figure]]:
     """Analyze t-distribution with calculations and optional visualization."""
     results = calculate_t_critical(df, alpha, alternative, t_stat, mean_diff, std_error)
-    fig = visualize_t_distribution(results, show_plot=visualize, figure_size=figure_size) if visualize else None
+    fig = None
+    if visualize:
+        fig = visualize_t_distribution(results, show_plot=show_plot, figure_size=figure_size)
     return results, fig
