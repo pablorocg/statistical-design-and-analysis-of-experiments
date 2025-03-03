@@ -26,14 +26,14 @@ Each module offers statistical calculations, hypothesis testing, and beautiful v
 ### Install using pip
 
 ```bash
-pip install git+https://github.com/yourusername/statistical-testing-library.git
+pip install git+https://github.com/pablorocg/statistical-design-and-analysis-of-experiments.git
 ```
 
 Or clone the repository and install locally:
 
 ```bash
-git clone https://github.com/yourusername/statistical-testing-library.git
-cd statistical-testing-library
+git clone https://github.com/pablorocg/statistical-design-and-analysis-of-experiments.git
+cd statistical-design-and-analysis-of-experiments
 pip install -e .
 ```
 
